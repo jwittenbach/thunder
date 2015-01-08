@@ -1,7 +1,10 @@
+from thunder.utils.common import pinv
+from numpy import dot
+
 class LocalRegressionModel(object):
 
 	def __init__(self, betas=None):
-		model.betas = betas
+		self.betas = betas
 
 	def fit(self, Xhat, y):
 		self.betas = dot(Xhat, y)
@@ -14,8 +17,8 @@ class LocalRegressionModel(object):
 		yhat = self.predict(X)
 		residuals = y - yhat
 		const_residuals = y - mean(y)
-		ss_redid = sum(residuals**2)
-		ss_total = sum(const_rediduals**2)
+		ss_resid = sum(residuals**2)
+		ss_total = sum(const_residuals**2)
 		if ss_total == 0:
 			r_squared = 0
 		else:
@@ -25,7 +28,7 @@ class LocalRegressionModel(object):
 	def fit_with_stats(self, Xhat, X, y):
 		self.fit(Xhat, y)
 		stats = self.stats(X, y)
-		return (self, stats)
+		return self, stats
 
 	def predict_with_stats(self, X, y):
 		return self.predict(X), self.stats(X, y)
@@ -36,8 +39,8 @@ class Regression(object):
 		pass
 
 	def fit(self, X, y):
-		Xhat = p_inv(X)
-		fitted = y.rdd.map(lambda (k, v): (k, LocalRegressionModel().fit(Xhat,v)))
+		Xhat = pinv(X)
+		fitted = y.rdd.map(lambda (k, v): (k, LocalRegressionModel().fit(Xhat, v)))
 		return RegressionModel(fitted)
 
 	def fitWithStats(self, X, y):
@@ -58,5 +61,5 @@ class RegressionModel(object):
 	def predict(self, X):
 		return self.rdd.map(lambda (k, v): (k, v.predict(X)))
 
-	def predictWithStats(self, X, y)
+	def predictWithStats(self, X, y):
 		return self.rdd.map(lambda (k, v): (k, v.pre))

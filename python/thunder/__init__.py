@@ -5,8 +5,8 @@ from thunder.factorization.pca import PCA
 from thunder.factorization.svd import SVD
 from thunder.factorization.ica import ICA
 from thunder.factorization.nmf import NMF
-from thunder.regression.regress import RegressionModel
-from thunder.regression.regress import MeanRegressionModel, LinearRegressionModel, BilinearRegressionModel
+from thunder.regression.regress import Regression, RegressionModel, LocalRegressionModel
+#from thunder.regression.regress import MeanRegressionModel, LinearRegressionModel, BilinearRegressionModel
 from thunder.clustering.kmeans import KMeans, KMeansModel
 from thunder.regression.tuning import TuningModel
 from thunder.regression.tuning import GaussianTuningModel, CircularTuningModel
