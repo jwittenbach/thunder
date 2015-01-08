@@ -12,10 +12,10 @@ import urlparse
 import math
 
 from thunder.rdds.fileio.writers import getParallelWriterForPath
-from thunder.rdds.imageblocks import ImageBlocks
 from thunder.rdds.keys import Dimensions
 from thunder.rdds.fileio.readers import getFileReaderForPath, FileNotFoundError, selectByStartAndStopIndices, \
     appendExtensionToPathSpec
+from thunder.rdds.imgblocks.blocks import SimpleBlocks
 from thunder.rdds.series import Series
 from thunder.utils.common import parseMemoryString, smallest_float_type
 
@@ -554,6 +554,11 @@ class SeriesLoader(object):
 
     @staticmethod
     def __saveSeriesRdd(seriesblocks, outputdirname, dims, npointsinseries, datatype, overwrite=False):
+        if not overwrite:
+            from thunder.utils.common import raiseErrorIfPathExists
+            raiseErrorIfPathExists(outputdirname)
+            overwrite = True  # prevent additional downstream checks for this path
+
         writer = getParallelWriterForPath(outputdirname)(outputdirname, overwrite=overwrite)
 
         def blockToBinarySeries(kviter):
@@ -563,7 +568,7 @@ class SeriesLoader(object):
             for seriesKey, series in kviter:
                 if keypacker is None:
                     keypacker = struct.Struct('h'*len(seriesKey))
-                    label = ImageBlocks.getBinarySeriesNameForKey(seriesKey) + ".bin"
+                    label = SimpleBlocks.getBinarySeriesNameForKey(seriesKey) + ".bin"
                 buf.write(keypacker.pack(*seriesKey))
                 buf.write(series.tostring())
             val = buf.getvalue()
@@ -571,8 +576,7 @@ class SeriesLoader(object):
             return [(label, val)]
 
         seriesblocks.mapPartitions(blockToBinarySeries).foreach(writer.writerFcn)
-        writeSeriesConfig(outputdirname, len(dims), npointsinseries, dims=dims, valuetype=datatype,
-                          overwrite=overwrite)
+        writeSeriesConfig(outputdirname, len(dims), npointsinseries, valuetype=datatype, overwrite=overwrite)
 
     def saveFromStack(self, datapath, outputdirpath, dims, ext="stack", blockSize="150M", datatype='int16',
                       newdtype=None, casting='safe', startidx=None, stopidx=None, overwrite=False):
@@ -616,6 +620,11 @@ class SeriesLoader(object):
             already exists. If false, a ValueError will be thrown if outputdirpath is found to already exist.
 
         """
+        if not overwrite:
+            from thunder.utils.common import raiseErrorIfPathExists
+            raiseErrorIfPathExists(outputdirpath)
+            overwrite = True  # prevent additional downstream checks for this path
+
         seriesblocks, npointsinseries, newdtype = \
             self._getSeriesBlocksFromStack(datapath, dims, ext=ext, blockSize=blockSize, datatype=datatype,
                                            newdtype=newdtype, casting=casting, startidx=startidx, stopidx=stopidx)
@@ -659,6 +668,11 @@ class SeriesLoader(object):
             already exists. If false, a ValueError will be thrown if outputdirpath is found to already exist.
 
         """
+        if not overwrite:
+            from thunder.utils.common import raiseErrorIfPathExists
+            raiseErrorIfPathExists(outputdirpath)
+            overwrite = True  # prevent additional downstream checks for this path
+
         seriesblocks, metadata = self._getSeriesBlocksFromMultiTif(datapath, ext=ext, blockSize=blockSize,
                                                                    newdtype=newdtype, casting=casting,
                                                                    startidx=startidx, stopidx=stopidx)
@@ -726,8 +740,8 @@ class SeriesLoader(object):
         return params
 
 
-def writeSeriesConfig(outputdirname, nkeys, nvalues, dims=None, keytype='int16', valuetype='int16',
-                      confname="conf.json", overwrite=True):
+def writeSeriesConfig(outputdirname, nkeys, nvalues, keytype='int16', valuetype='int16', confname="conf.json",
+                      overwrite=True):
     """Helper function to write out a conf.json file with required information to load Series binary data.
     """
     import json
@@ -738,8 +752,6 @@ def writeSeriesConfig(outputdirname, nkeys, nvalues, dims=None, keytype='int16',
     conf = {'input': outputdirname,
             'nkeys': nkeys, 'nvalues': nvalues,
             'valuetype': str(valuetype), 'keytype': str(keytype)}
-    if dims:
-        conf["dims"] = dims
 
     confwriter = filewriterclass(outputdirname, confname, overwrite=overwrite)
     confwriter.writeFile(json.dumps(conf, indent=2))
