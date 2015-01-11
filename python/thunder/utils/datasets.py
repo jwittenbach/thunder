@@ -2,7 +2,7 @@
 Utilities for generating example datasets
 """
 
-from numpy import array, random, shape, floor, dot, linspace, sin, sign, c_
+from numpy import array, random, shape, floor, dot, linspace, sin, sign, c_, vstack, ones, squeeze
 
 from thunder.rdds.matrices import RowMatrix
 from thunder.rdds.series import Series
@@ -32,6 +32,26 @@ def appendkeys(data):
     z = (random.rand(n) * n).astype(int)
     data_zipped = zip(x, y, z, data)
     return map(lambda (k1, k2, k3, v): ((k1, k2, k3), v), data_zipped)
+
+
+class RegressionData(DataSets):
+
+    def generate(self, inputdim=2, outputdim=1, constantterm=True, length=20, differentbetas=False, npartitions=10, nrecords=100, noise=0.1, seed=None):
+        series = random.randn(inputdim, length)
+        if constantterm:
+            series = vstack((ones((1,length)), series))
+            inputdim = inputdim + 1
+        if differentbetas:
+            betas = 3*random.randn(nrecords, outputdim, inputdim)
+            data_local = [dot(squeeze(betas[i]), series) + noise*random.randn(outputdim, length) for i in range(nrecords)]
+        else:
+            betas = 3*random.randn(outputdim, inputdim)
+            data_local = [dot(betas, series) + noise*random.randn(outputdim, length) for i in range(nrecords)]
+        data = Series(self.sc.parallelize(appendkeys(data_local), npartitions))
+        if self.returnparams is True:
+            return data, series, betas
+        else:
+            return data
 
 
 class KMeansData(DataSets):
@@ -85,5 +105,6 @@ class ICAData(DataSets):
 DATASET_MAKERS = {
     'kmeans': KMeansData,
     'pca': PCAData,
-    'ica': ICAData
+    'ica': ICAData,
+    'regression': RegressionData
 }
