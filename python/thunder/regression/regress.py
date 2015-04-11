@@ -1,4 +1,4 @@
-from numpy import dot, vstack, zeros, sqrt
+from numpy import dot, hstack, vstack, zeros, sqrt
 from scipy.linalg import inv
 
 class RegressionBuilder(object):
@@ -31,7 +31,7 @@ class Regression(object):
 		}
 		# other options: linear, ridge, lasso, tikhonov, constrained, basis
 
-		return REGALGORITHMS[algorithm](kwargs)
+		return REGALGORITHMS[algorithm](**kwargs)
 
 #---------
 
@@ -40,15 +40,15 @@ class RegressionAlgorithm(object):
 	Abstract base class for all RegressionAlgorithms
 	'''
 
-	def __init__(self):
+	def __init__(self, **kwargs):
 		raise notImplementedError
 
 	def preprocessing(self):
 		raise notImplementedError
 
 	def fit(self, X, y):
-		self.preprocessing(X, y)
-		newrdd = self.y.rdd.mapValues(lambda v: LocalRegressionModel().fit(self.algorithm, v))
+		algorithm, y = self.preprocessing(X, y)
+		newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(algorithm, v))
 		return RegressionModel(newrdd)
 
 
@@ -59,12 +59,13 @@ class RidgeRegressionAlgorithm(RegressionAlgorithm):
 
 	def __init__(self, **kwargs):
 		self.R = kwargs['R']
-		self.c = kwargs['lambda']
+		self.c = kwargs['c']
 
 	def preprocessing(self, X, y):
 		X = vstack([X, sqrt(self.c)*self.R])
-		self.y = y.mapValues(lambda v: vstack([v, zeros(self.R.shape[0])]))
-		self.algorithm = PseudoInv(X)
+		y  = y.applyValues(lambda v: hstack([v, zeros(self.R.shape[0])]))
+		algorithm = PseudoInv(X)
+		return algorithm, y
 
 #---------
 
@@ -98,7 +99,7 @@ class PseudoInv(RegressionFitter):
 	'''
 
 	def __init__(self, X):
-		self.Xhat = dot(inv(X.T, X), X.T)
+		self.Xhat = dot(inv(dot(X.T, X)), X.T)
 
 	def fit(self, y):
 		return dot(self.Xhat, y)
