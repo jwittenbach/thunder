@@ -1,4 +1,4 @@
-from numpy import dot, inv, vstack, zeros, sqrt
+from numpy import dot, vstack, zeros, sqrt
 from scipy.linalg import inv
 
 class RegressionBuilder(object):
