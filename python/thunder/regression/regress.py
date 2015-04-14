@@ -139,10 +139,9 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 		self.b = kwargs['b']
 
 	def preprocessing(self, X, y):
-		y = y.applyValues(lambda v: array(dot(X.T, v), ndmin=2).T)
-		P = dot(X.T, X)
-		algorithm = QuadProg(P, self.A, self.b)
+		algorithm = QuadProg(X, self.A, self.b)
 		return algorithm, y
+
 
 #---------
 
@@ -188,15 +187,16 @@ class QuadProg(RegressionFitter):
 	cvxopt.solvers.qp minimizes (1/2)*x'*P*x + q'*x with the constraint Ax <= b
 	'''
 
-	def __init__(self, P, A, b):
-		self.P = cvxoptMatrix(P)
+	def __init__(self, X, A, b):
+		self.X = X
+		self.P = cvxoptMatrix(dot(X.T, X))
 		self.A = cvxoptMatrix(A)
 		self.b = cvxoptMatrix(b)
 
-	def fit(self, q):
+	def fit(self, y):
 		from cvxopt.solvers import qp, options
 		options['show_progress'] = False
-		q = cvxoptMatrix(q)
+		q = cvxoptMatrix(array(dot(self.X.T, y), ndmin=2).T)
 		return array(qp(self.P, q, self.A, self.b)['x'])
 
 #---------
