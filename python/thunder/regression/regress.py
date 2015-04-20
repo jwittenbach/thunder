@@ -19,7 +19,7 @@ print model.rdd.mapValues(lambda v: v.betas).values().collect()
 '''
 
 
-from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array
+from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert
 from scipy.linalg import inv
 
 class RegressionBuilder(object):
@@ -49,8 +49,7 @@ class Regression(object):
 
 		REGALGORITHMS = {
 			'linear': LinearRegressionAlgorithm,
-			'ridge': RidgeRegressionAlgorithm,
-			'tikhonov': RidgeRegressionAlgorithm,
+			'tikhonov': TikhonovRegressionAlgorithm,
 			'constrained': ConstrainedRegressionAlgorithm
 		}
 		# other options: linear, ridge, lasso, tikhonov, constrained, basis
@@ -70,16 +69,53 @@ class RegressionAlgorithm(object):
 		else:
 			self.intercept = True
 
-	def preprocessing(self):
-		raise notImplementedError
+		if kwargs.has_key('normalize') and kwargs['normalize']:
+			self.normalize = True
+		else:
+			self.normalize = False
+
+	def prepare(self):
+		raise NotImplementedError
 
 	def fit(self, X, y):
-		if self.intercept:
-			X = hstack([ones([X.shape[0], 1]), X])
-			print X
-		algorithm, y = self.preprocessing(X, y)
+		
+		if self.normalize:
+			scale = Scale(X)
+			X = scale.transform(X)
+
+		algorithm, transforms = self.prepare(X)
 		newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(algorithm, v))
-		return RegressionModel(newrdd)
+
+		if self.intercept or self.normalize:
+			transforms.append(AddConstant)
+			index = 1
+		else:
+			index = 0
+
+		#if self.normalize:
+		#	if self.intercept:
+		#		def unscale(betas, scale):
+		#			intercept = betas[0] - dot(scale.mean, betas[1:])
+		#			slopes = betas[1:0]/scale.std
+		#			return np.insert(slope, 0, intercept)
+		#	else:
+		#		def unscale(betas, scale):
+		#			return betas/scale.std
+		#	newrdd = newrdd.mapValues(lambda v: v.setBetas(unscale(v.betas, scale)))
+		if self.normalize:
+				def unscale(betas, scale):
+					if self.intercept:
+						b0 = betas[0]
+						start = 1
+					else:
+						b0 = 0
+						start = 0
+					slopes = betas[start:]/scale.std
+					intercept = b0 - dot(scale.mean, slopes)
+					return insert(slopes, 0, intercept)
+				newrdd = newrdd.mapValues(lambda v: v.setBetas(unscale(v.betas, scale)))
+
+		return RegressionModel(newrdd, transforms)
 
 
 class LinearRegressionAlgorithm(RegressionAlgorithm):
@@ -90,25 +126,12 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
 	def __init__(self, **kwargs):
 		super(self.__class__, self).__init__(**kwargs)
 
-	def preprocessing(self, X, y):
+	def prepare(self, X):
+		if self.intercept:
+			X = applyTranforms(X, AddConstant)
 		algorithm = PseudoInv(X)
-		return algorithm, y
-
-
-class RidgeRegressionAlgorithm(RegressionAlgorithm):
-	'''
-	Class for fitting ridge regression models
-	'''
-
-	def __init__(self, **kwargs):
-		super(self.__class__, self).__init__(*kwargs)
-		self.c = kwargs['c']
-
-	def preprocessing(self, X, y):
-		R = self.c * eye(X.shape[1])
-		y = y.applyValues(lambda v: hstack([v, zeros(self.X.shape[1])]))
-		algorithm = PsuedoInv(X)
-		return algorithm, y
+		transforms = []
+		return algorithm, transforms
 
 
 class TikhonovRegressionAlgorithm(RegressionAlgorithm):
@@ -121,12 +144,13 @@ class TikhonovRegressionAlgorithm(RegressionAlgorithm):
 		self.R = kwargs['R']
 		self.c = kwargs['c']
 
-	def preprocessing(self, X, y):
+	def prepare(self, X):
+		nPenalties = self.R.shape[0]
 		X = vstack([X, sqrt(self.c)*self.R])
-		y  = y.applyValues(lambda v: hstack([v, zeros(self.R.shape[0])]))
-		algorithm = PseudoInv(X)
-		return algorithm, y
-
+		algorithm = TikhonovPseudoInv(X, nPenalties, intercept=self.intercept)
+		transforms = []
+		return algorithm, transforms
+ 
 
 class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 	'''
@@ -138,9 +162,12 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 		self.A = kwargs['A']
 		self.b = kwargs['b']
 
-	def preprocessing(self, X, y):
+	def prepare(self, X):
+		if self.intercept:
+			X = applyTranforms(X, AddConstant)
 		algorithm = QuadProg(X, self.A, self.b)
-		return algorithm, y
+		transforms = []
+		return algorithm, transforms
 
 
 #---------
@@ -150,54 +177,82 @@ class RegressionModel(object):
 	Class for fitted regression models
 	'''
 
-	def __init__(self, rdd):
+	def __init__(self, rdd, transforms=[]):
 		self.rdd = rdd
+		if not (type(transforms) is list or type(transforms) is tuple):
+			transforms = [transforms]
+		self.transforms = transforms
 
 	def predict(self, X):
-		return Series(rdd.mapValues(lambda v: v.predict(X)))
+		X = applyTranforms(X, self.transforms)
+		return self.rdd.mapValues(lambda v: v.predict(X))
 
 #---------
 
-class RegressionFitter(object):
+class RegressionEstimator(object):
 	'''
 	Abstract base class for all regression fitting procedures
 	'''
 
-	def __init__(self):
-		raise notImplementedError
+	def __init__(self, intercept=False):
+		self.intercept = intercept
+
+	def estimate(self, y):
+		raise NotImplementedError
 
 	def fit(self, y):
-		raise notImplementedError
+		if self.intercept:
+			b0 = mean(y)
+			y = y - b0
 
-class PseudoInv(RegressionFitter):
+		b = self.estimate(y)
+
+		if self.intercept:
+			b = insert(b, 0, b0)
+		return b
+
+class PseudoInv(RegressionEstimator):
 	'''
 	Class for fitting regression models via a psuedo-inverse
 	'''
 
-	def __init__(self, X):
+	def __init__(self, X, **kwargs):
+		super(self.__class__, self).__init__(**kwargs)
 		self.Xhat = dot(inv(dot(X.T, X)), X.T)
 
-	def fit(self, y):
+	def estimate(self, y):
 		return dot(self.Xhat, y)
 
-class QuadProg(RegressionFitter):
+class TikhonovPseudoInv(RegressionEstimator):
+
+	def __init__(self, X, n, **kwargs):
+		super(self.__class__, self).__init__(**kwargs)
+		self.Xhat = dot(inv(dot(X.T, X)), X.T)
+		self.n = n
+
+	def estimate(self, y):
+		y = append(y, zeros(self.n))
+		return dot(self.Xhat, y)
+
+class QuadProg(RegressionEstimator):
 	'''
 	Class for fitting regression models via quadratic programming
 
 	cvxopt.solvers.qp minimizes (1/2)*x'*P*x + q'*x with the constraint Ax <= b
 	'''
 
-	def __init__(self, X, A, b):
+	def __init__(self, X, A, b, **kwargs):
+		super(self.__class__, self).__init__(**kwargs)
 		self.X = X
 		self.P = cvxoptMatrix(dot(X.T, X))
 		self.A = cvxoptMatrix(A)
 		self.b = cvxoptMatrix(b)
 
-	def fit(self, y):
+	def estimate(self, y):
 		from cvxopt.solvers import qp, options
 		options['show_progress'] = False
-		q = cvxoptMatrix(array(dot(self.X.T, y), ndmin=2).T)
-		return array(qp(self.P, q, self.A, self.b)['x'])
+		q = cvxoptMatrix(array(dot(-self.X.T, y), ndmin=2).T)
+		return array(qp(self.P, q, self.A, self.b)['x']).flatten()
 
 #---------
 
@@ -206,8 +261,8 @@ class LocalRegressionModel(object):
 	Class for fitting and predicting with regression models for each record
 	'''
 
-	def __init__(self):
-		self.betas = None
+	def __init__(self, betas=None):
+		self.betas = betas
 
 	def fit(self, algorithm, y):
 		self.betas = algorithm.fit(y)
@@ -216,10 +271,68 @@ class LocalRegressionModel(object):
 	def predict(self, X):
 		return dot(X, self.betas)
 
+	def setBetas(self, betas):
+		self.betas = betas
+		return self
+
+#---------
+
+class Transformation(object):
+	'''
+	Class for transforming data before fitting/predicting
+	'''
+
+	def __init__(self):
+		raise NotImplementedError
+
+	def transform(self):
+		raise NotImplementedError
+
+class Scale(Transformation):
+	'''
+	Class for scaling data
+	'''
+
+	def __init__(self, X):
+		self.mean = mean(X, axis=0)
+		self.std = std(X, axis=0)
+
+	def transform(self, X):
+		return (X - self.mean)/self.std
+
+class Center(Transformation):
+	'''
+	Class for centering data
+	'''
+
+	def __init__(self, X):
+		self.mean = mean(X, axis=0)
+
+	def transform(self, X):
+		return X - self.mean
+
+class AddConstant(Transformation):
+	'''
+	Class for adding a column of 1s to a data matrix
+	'''
+
+	def __init__(self, X):
+		pass
+
+	def transform(self, X):
+		return hstack([ones([X.shape[0], 1]), X])
+
 #---------
 
 def cvxoptMatrix(x):
 	from cvxopt import matrix
 	return matrix(x, x.shape, 'd')
+
+def applyTranforms(X, transforms):
+	if not (type(transforms) is list or type(transforms) is tuple):
+		transforms = [transforms]
+	for t in transforms:
+		X = t(X).transform(X)
+	return X
 
 # -------------------------------------------------------------------------------------------
