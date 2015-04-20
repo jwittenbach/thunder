@@ -19,7 +19,7 @@ print model.rdd.mapValues(lambda v: v.betas).values().collect()
 '''
 
 
-from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert
+from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate
 from scipy.linalg import inv
 
 class RegressionBuilder(object):
@@ -92,16 +92,6 @@ class RegressionAlgorithm(object):
 		else:
 			index = 0
 
-		#if self.normalize:
-		#	if self.intercept:
-		#		def unscale(betas, scale):
-		#			intercept = betas[0] - dot(scale.mean, betas[1:])
-		#			slopes = betas[1:0]/scale.std
-		#			return np.insert(slope, 0, intercept)
-		#	else:
-		#		def unscale(betas, scale):
-		#			return betas/scale.std
-		#	newrdd = newrdd.mapValues(lambda v: v.setBetas(unscale(v.betas, scale)))
 		if self.normalize:
 				def unscale(betas, scale):
 					if self.intercept:
@@ -127,9 +117,7 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
 		super(self.__class__, self).__init__(**kwargs)
 
 	def prepare(self, X):
-		if self.intercept:
-			X = applyTranforms(X, AddConstant)
-		algorithm = PseudoInv(X)
+		algorithm = PseudoInv(X, intercept=self.intercept)
 		transforms = []
 		return algorithm, transforms
 
@@ -164,7 +152,7 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 
 	def prepare(self, X):
 		if self.intercept:
-			X = applyTranforms(X, AddConstant)
+			X = AddConstant(X).transform(X)
 		algorithm = QuadProg(X, self.A, self.b)
 		transforms = []
 		return algorithm, transforms
@@ -217,22 +205,25 @@ class PseudoInv(RegressionEstimator):
 	'''
 
 	def __init__(self, X, **kwargs):
-		super(self.__class__, self).__init__(**kwargs)
+		super(PseudoInv, self).__init__(**kwargs)
 		self.Xhat = dot(inv(dot(X.T, X)), X.T)
 
 	def estimate(self, y):
 		return dot(self.Xhat, y)
 
-class TikhonovPseudoInv(RegressionEstimator):
+class TikhonovPseudoInv(PseudoInv):
+	'''
+	Class for fitting Tikhonov regularization models via a psuedo-inverse
+	'''
 
-	def __init__(self, X, n, **kwargs):
-		super(self.__class__, self).__init__(**kwargs)
-		self.Xhat = dot(inv(dot(X.T, X)), X.T)
-		self.n = n
+	def __init__(self, X, nPenalties, **kwargs):
+		self.nPenalties = nPenalties
+		super(TikhonovPseudoInv, self).__init__(X, **kwargs)
 
 	def estimate(self, y):
-		y = append(y, zeros(self.n))
-		return dot(self.Xhat, y)
+		y = hstack([y, zeros(self.nPenalties)])
+		return super(TikhonovPseudoInv, self).estimate(y)
+
 
 class QuadProg(RegressionEstimator):
 	'''
@@ -295,7 +286,7 @@ class Scale(Transformation):
 
 	def __init__(self, X):
 		self.mean = mean(X, axis=0)
-		self.std = std(X, axis=0)
+		self.std = std(X, ddof=1, axis=0)
 
 	def transform(self, X):
 		return (X - self.mean)/self.std
