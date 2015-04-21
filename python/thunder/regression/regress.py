@@ -171,11 +171,9 @@ class RegressionModel(object):
 			transforms = [transforms]
 		self.transforms = transforms
 
-    def predict(self, X):
-		X = applyTranforms(X, self.transforms)
-		return self.rdd.mapValues(lambda v: v.predict(X))
-
-    def 
+    #def predict(self, X):
+	#X = applyTranforms(X, self.transforms)
+	#return self.rdd.mapValues(lambda v: v.predict(X))
 
 #---------
 
@@ -264,27 +262,27 @@ class LocalRegressionModel(object):
 	def getPrediction(self, X):
 		return dot(X, self.betas)
 
-    def getStats(self, y, yhat):
-        SST = sum(square(y - mean(y)))
-        SSR = sum(square(y - yhat))
+	def getStats(self, y, yhat):
+		SST = sum(square(y - mean(y)))
+		SSR = sum(square(y - yhat))
 
-        if SST = 0:
-            Rsq = 1 
-        else:
-            Rsq = 1 - SSR/SST
+		if SST == 0:
+			Rsq = 1
+		else:
+			Rsq = 1 - SSR/SST
 
-        return Rsq
+		return Rsq
 
-    def predict(X):
-        return self.getPrediction(X)
+	def predict(X):
+		return self.getPrediction(X)
 
-    def score(X, y):
-        yhat = self.getPrediction(X)
-        return self.getStats(y, yhat)
+	def score(X, y):
+		yhat = self.getPrediction(X)
+		return self.getStats(y, yhat)
 
-    def predictAndScore(X, y):
-        yhat = self.getPrediction(X)
-        return yhat, self.getStats(y, yhat)
+	def predictAndScore(X, y):
+		yhat = self.getPrediction(X)
+		return yhat, self.getStats(y, yhat)
 
 	def setBetas(self, betas):
 		self.betas = betas
