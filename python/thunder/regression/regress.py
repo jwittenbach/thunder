@@ -19,7 +19,7 @@ print model.rdd.mapValues(lambda v: v.betas).values().collect()
 '''
 
 
-from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate
+from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square
 from scipy.linalg import inv
 
 class RegressionBuilder(object):
@@ -171,9 +171,11 @@ class RegressionModel(object):
 			transforms = [transforms]
 		self.transforms = transforms
 
-	def predict(self, X):
+    def predict(self, X):
 		X = applyTranforms(X, self.transforms)
 		return self.rdd.mapValues(lambda v: v.predict(X))
+
+    def 
 
 #---------
 
@@ -258,9 +260,31 @@ class LocalRegressionModel(object):
 	def fit(self, algorithm, y):
 		self.betas = algorithm.fit(y)
 		return self
-
-	def predict(self, X):
+    
+	def getPrediction(self, X):
 		return dot(X, self.betas)
+
+    def getStats(self, y, yhat):
+        SST = sum(square(y - mean(y)))
+        SSR = sum(square(y - yhat))
+
+        if SST = 0:
+            Rsq = 1 
+        else:
+            Rsq = 1 - SSR/SST
+
+        return Rsq
+
+    def predict(X):
+        return self.getPrediction(X)
+
+    def score(X, y):
+        yhat = self.getPrediction(X)
+        return self.getStats(y, yhat)
+
+    def predictAndScore(X, y):
+        yhat = self.getPrediction(X)
+        return yhat, self.getStats(y, yhat)
 
 	def setBetas(self, betas):
 		self.betas = betas
