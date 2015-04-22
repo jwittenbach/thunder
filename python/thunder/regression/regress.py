@@ -19,7 +19,7 @@ print model.rdd.mapValues(lambda v: v.betas).values().collect()
 '''
 
 
-from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square
+from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square, eye
 from scipy.linalg import inv
 from thunder.rdds.series import Series
 
@@ -53,6 +53,7 @@ class Regression(object):
         REGALGORITHMS = {
             'linear': LinearRegressionAlgorithm,
             'tikhonov': TikhonovRegressionAlgorithm,
+            'ridge': RidgeRegressionAlgorithm,
             'constrained': ConstrainedRegressionAlgorithm
         }
         # other options: linear, ridge, lasso, tikhonov, constrained, basis
@@ -120,32 +121,46 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
     '''
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__(**kwargs)
+        super(LinearRegressionAlgorithm, self).__init__(**kwargs)
 
     def prepare(self, X):
-        algorithm = PseudoInv(X, intercept=self.intercept)
+        if self.intercept:
+            X = AddConstant(X).transform(X)
+        algorithm = PseudoInv(X)
         transforms = []
         return algorithm, transforms
 
 
 class TikhonovRegressionAlgorithm(RegressionAlgorithm):
+    '''
+    Class for fitting Tikhonov regularization regression models
+    '''
 
+    def __init__(self, **kwargs):
+        super(TikhonovRegressionAlgorithm, self).__init__(**kwargs)
+        self.intercept = True
+        self.normalize = True
+        self.R = kwargs['R']
+        self.c = kwargs['c']
+        self.nPenalties = self.R.shape[0]
+
+    def prepare(self, X):
+        X = vstack([X, sqrt(self.c) * self.R])
+        algorithm = TikhonovPseudoInv(X, self.nPenalties, intercept=self.intercept)
+        transforms = []
+        return algorithm, transforms
+
+
+class RidgeRegressionAlgorithm(TikhonovRegressionAlgorithm):
     '''
     Class for fitting ridge regression models
     '''
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__(**kwargs)
-        self.R = kwargs['R']
-        self.c = kwargs['c']
-
-    def prepare(self, X):
-        nPenalties = self.R.shape[0]
-        X = vstack([X, sqrt(self.c) * self.R])
-        algorithm = TikhonovPseudoInv(X, nPenalties, intercept=self.intercept)
-        transforms = []
-        return algorithm, transforms
-
+        n = kwargs['n']
+        c = kwargs['c']
+        R = eye(n)
+        super(RidgeRegressionAlgorithm, self).__init__(R=R, **kwargs)
 
 class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 
@@ -154,7 +169,7 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
     '''
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__(**kwargs)
+        super(ConstrainedRegressionAlgorithm, self).__init__(**kwargs)
         self.A = kwargs['A']
         self.b = kwargs['b']
 
@@ -210,6 +225,12 @@ class RegressionEstimator(object):
             b0 = mean(y)
             y = y - b0
 
+        b = self.estimate(y)
+
+        if self.intercept:
+            b = insert(b, 0, b0)
+        return b
+
 class PseudoInv(RegressionEstimator):
     '''
     Class for fitting regression models via a psuedo-inverse
@@ -244,7 +265,7 @@ class QuadProg(RegressionEstimator):
     '''
 
     def __init__(self, X, A, b, **kwargs):
-        super(self.__class__, self).__init__(**kwargs)
+        super(QuadProg, self).__init__(**kwargs)
         self.X = X
         self.P = cvxoptMatrix(dot(X.T, X))
         self.A = cvxoptMatrix(A)
