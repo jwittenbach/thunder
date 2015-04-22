@@ -19,9 +19,9 @@ print model.rdd.mapValues(lambda v: v.betas).values().collect()
 '''
 
 
-from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square, Series
+from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square
 from scipy.linalg import inv
-
+from thunder.rdds.series import Series
 
 class RegressionBuilder(object):
 
@@ -180,6 +180,7 @@ class RegressionModel(object):
             transforms = [transforms]
         self.transforms = transforms
 
+    @property
     def coefs(self):
         return Series(self.rdd.mapValues(lambda v: v.betas))
 
@@ -209,60 +210,6 @@ class RegressionEstimator(object):
             b0 = mean(y)
             y = y - b0
 
-        b = self.estimate(y)
-
-        if self.intercept:
-            b = insert(b, 0, b0)
-        return b
-
-class PseudoInv(RegressionEstimator):
-    '''
-    Class for fitting regression models via a psuedo-inverse
-    '''
-
-    def __init__(self, X, **kwargs):
-        super(PseudoInv, self).__init__(**kwargs)
-        self.Xhat = dot(inv(dot(X.T, X)), X.T)
-
-    def estimate(self, y):
-        return dot(self.Xhat, y)
-
-class TikhonovPseudoInv(PseudoInv):
-    '''
-    Class for fitting Tikhonov regularization models via a psuedo-inverse
-    '''
-
-    def __init__(self, X, nPenalties, **kwargs):
-        self.nPenalties = nPenalties
-        super(TikhonovPseudoInv, self).__init__(X, **kwargs)
-
-    def estimate(self, y):
-        y = hstack([y, zeros(self.nPenalties)])
-        return super(TikhonovPseudoInv, self).estimate(y)
-
-
-class QuadProg(RegressionEstimator):
-    '''
-    Class for fitting regression models via quadratic programming
-
-    cvxopt.solvers.qp minimizes (1/2)*x'*P*x + q'*x with the constraint Ax <= b
-    '''
-
-    def __init__(self, X, A, b, **kwargs):
-        super(self.__class__, self).__init__(**kwargs)
-        self.X = X
-        self.P = cvxoptMatrix(dot(X.T, X))
-        self.A = cvxoptMatrix(A)
-        self.b = cvxoptMatrix(b)
-
-    def estimate(self, y):
-        from cvxopt.solvers import qp, options
-        options['show_progress'] = False
-        q = cvxoptMatrix(array(dot(-self.X.T, y), ndmin=2).T)
-        return array(qp(self.P, q, self.A, self.b)['x']).flatten()
-
-#---------
-
 class LocalRegressionModel(object):
     '''
     Class for fitting and predicting with regression models for each record
@@ -289,14 +236,14 @@ class LocalRegressionModel(object):
 
         return Rsq
 
-    def predict(X):
+    def predict(self, X):
         return self.getPrediction(X)
 
-    def score(X, y):
+    def score(self, X, y):
         yhat = self.getPrediction(X)
         return self.getStats(y, yhat)
 
-    def predictAndScore(X, y):
+    def predictAndScore(self, X, y):
         yhat = self.getPrediction(X)
         return yhat, self.getStats(y, yhat)
 
@@ -364,4 +311,3 @@ def applyTranforms(X, transforms):
         X = t(X).transform(X)
     return X
 
-# -------------------------------------------------------------------------------------------
