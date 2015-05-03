@@ -113,6 +113,12 @@ class RegressionAlgorithm(object):
 
         return RegressionModel(newrdd, transforms)
 
+    def fitWithStats(self, X, y):
+
+        regModel = self.fit(X, y)
+        stats = regModel.stats(X, y)
+        return self, stats
+
 
 class LinearRegressionAlgorithm(RegressionAlgorithm):
 
@@ -205,7 +211,17 @@ class RegressionModel(object):
 
     def stats(self, X, y):
         X = applyTransforms(X, self.transforms)
-        return self.rdd.mapsValues(lambda v: v.score(X, y))
+        joined = fastJoin(self.rdd, y.rdd)
+        newrdd = joined.mapValues(lambda (model, y): model.stats(X, y))
+        return Series(newrdd)
+
+    def predictWithStats(self, X, y):
+        X = applyTransforms(X, self.transforms)
+        joined = fastJoin(self.rdd, y.rdd)
+        results = joined.mapValues(lambda (model, y): model.predictWithStats(X, y))
+        yhat = results.mapValues(lambda v: v[0])
+        stats = results.mapValues(lambda v: v[1])
+        return Series(yhat), Series(stats)
 
 #---------
 
@@ -290,11 +306,14 @@ class LocalRegressionModel(object):
     def fit(self, algorithm, y):
         self.betas = algorithm.fit(y)
         return self
-    
-    def getPrediction(self, X):
+
+    def predict(self, X):
         return dot(X, self.betas)
 
-    def getStats(self, y, yhat):
+    def stats(self, X, y, yhat=None):
+        if yhat is None:
+            yhat = self.predict(X)
+
         SST = sum(square(y - mean(y)))
         SSR = sum(square(y - yhat))
 
@@ -305,21 +324,11 @@ class LocalRegressionModel(object):
 
         return Rsq
 
-    def predict(self, X):
-        return self.getPrediction(X)
-
-    def score(self, X, y):
-        yhat = self.getPrediction(X)
-        return self.getStats(y, yhat)
-
-    def predictAndScore(self, X, y):
-        yhat = self.getPrediction(X)
-        return yhat, self.getStats(y, yhat)
-
-    def setBetas(self, betas):
-        self.betas = betas
-        return self
-
+    def predictWithStats(self, X, y):
+        yhat = self.predict(X)
+        stats = self.stats(X, y, yhat)
+        return yhat, stats
+         
 #---------
 
 class Transformation(object):
@@ -380,3 +389,15 @@ def applyTranforms(X, transforms):
         X = t(X).transform(X)
     return X
 
+def fastJoin(rdd1, rdd2):
+    '''
+    function to quickly join two rdds
+
+    assumes that both rdds contain key-value pairs and that they are
+    related through a series of maps on the values
+    '''
+
+    try:
+        return rdd1.zip(rdd2).map(lambda (x, y): (x[0], [x[1], y[1]]))
+    except:
+        raise ValueError("could not do a fast join on rdds - should be related by a map on values")
