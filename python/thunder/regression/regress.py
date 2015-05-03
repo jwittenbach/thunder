@@ -117,7 +117,7 @@ class RegressionAlgorithm(object):
 
         regModel = self.fit(X, y)
         stats = regModel.stats(X, y)
-        return self, stats
+        return regModel, stats
 
 
 class LinearRegressionAlgorithm(RegressionAlgorithm):
@@ -206,8 +206,8 @@ class RegressionModel(object):
         return Series(self.rdd.mapValues(lambda v: v.betas))
 
     def predict(self, X):
-        X = applyTranforms(X, self.transforms)
-        return self.rdd.mapValues(lambda v: v.predict(X))
+        X = applyTransforms(X, self.transforms)
+        return Series(self.rdd.mapValues(lambda v: v.predict(X)))
 
     def stats(self, X, y):
         X = applyTransforms(X, self.transforms)
@@ -328,6 +328,10 @@ class LocalRegressionModel(object):
         yhat = self.predict(X)
         stats = self.stats(X, y, yhat)
         return yhat, stats
+
+    def setBetas(self, betas):
+        self.betas = betas
+        return self
          
 #---------
 
@@ -382,7 +386,7 @@ def cvxoptMatrix(x):
     from cvxopt import matrix
     return matrix(x, x.shape, 'd')
 
-def applyTranforms(X, transforms):
+def applyTransforms(X, transforms):
     if not (type(transforms) is list or type(transforms) is tuple):
         transforms = [transforms]
     for t in transforms:
