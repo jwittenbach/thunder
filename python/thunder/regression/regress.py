@@ -1,24 +1,3 @@
-'''
-Example code
-------------
-import numpy as np
-from thunder import Regression, Series
-
-y1, y2 = np.array([1,2,3]), np.array([4,5,6])
-y = Series(sc.parallelize([ ((1,), y1), ((2,), y2) ]))
-
-X = np.array([[1, 1], [1, 2], [1, 3]])
-
-R = np.array([[1, 0], [0, 1]])
-c = 0
-
-alg = Regression('tikhonov', R=R, c=c)
-model = alg.fit(X, y)
-
-print model.rdd.mapValues(lambda v: v.betas).values().collect()
-'''
-
-
 from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, mean, std, insert, concatenate, sum, square, eye
 from scipy.linalg import inv
 from thunder.rdds.series import Series
