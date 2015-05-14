@@ -23,24 +23,6 @@ from numpy import dot, hstack, vstack, zeros, sqrt, ones, eye, array, append, me
 from scipy.linalg import inv
 from thunder.rdds.series import Series
 
-class RegressionBuilder(object):
-
-    '''
-    Factory class for creating specialized GeneralRegressionAlgoritms that allow detailed
-    specification of all aspects of the regression.
-
-    Paramters that can be specified:
-        (1) optimization technique: psuedo-inverse, quadratic programming, gradient descent
-        (2) regularization type: 'lasso', 'ridge', 'tikhonov'
-        (3) regularization parameters: tihnohov matrix, regularization strength (aka lambda)
-        (4) equality constraints: constraint matrix, RHS vector
-        (5) inequality constraints: constraint matrix, RHS vector
-        (6) set if basis functions
-    '''
-
-    def __new__(cls, **kwargs):
-        return CustomRegressionAlgorithm(kwargs)
-
 
 class Regression(object):
 
@@ -89,8 +71,8 @@ class RegressionAlgorithm(object):
             scale = Scale(X)
             X = scale.transform(X)
 
-        algorithm, transforms = self.prepare(X)
-        newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(algorithm, v))
+        estimator, transforms = self.prepare(X)
+        newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
 
         if self.intercept or self.normalize:
             transforms.append(AddConstant)
@@ -132,9 +114,9 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
     def prepare(self, X):
         if self.intercept:
             X = AddConstant(X).transform(X)
-        algorithm = PseudoInv(X)
+        estimator = PseudoInv(X)
         transforms = []
-        return algorithm, transforms
+        return estimator, transforms
 
 
 class TikhonovRegressionAlgorithm(RegressionAlgorithm):
@@ -152,9 +134,9 @@ class TikhonovRegressionAlgorithm(RegressionAlgorithm):
 
     def prepare(self, X):
         X = vstack([X, sqrt(self.c) * self.R])
-        algorithm = TikhonovPseudoInv(X, self.nPenalties, intercept=self.intercept)
+        estimator = TikhonovPseudoInv(X, self.nPenalties, intercept=self.intercept)
         transforms = []
-        return algorithm, transforms
+        return estimator, transforms
 
 
 class RidgeRegressionAlgorithm(TikhonovRegressionAlgorithm):
@@ -182,9 +164,9 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
     def prepare(self, X):
         if self.intercept:
             X = AddConstant(X).transform(X)
-        algorithm = QuadProg(X, self.A, self.b)
+        estimator = QuadProg(X, self.A, self.b)
         transforms = []
-        return algorithm, transforms
+        return estimator, transforms
 
 
 #---------
@@ -303,8 +285,8 @@ class LocalRegressionModel(object):
     def __init__(self, betas=None):
         self.betas = betas
 
-    def fit(self, algorithm, y):
-        self.betas = algorithm.fit(y)
+    def fit(self, estimator, y):
+        self.betas = estimator.fit(y)
         return self
 
     def predict(self, X):
