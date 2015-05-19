@@ -348,10 +348,10 @@ def cvxoptMatrix(x):
     return matrix(x, x.shape, 'd')
 
 def applyTransforms(X, transforms):
-    if not (type(transforms) is list or type(transforms) is tuple):
+    if not (isinstance(transforms, list) or isinstance(transforms, tuple)):
         transforms = [transforms]
     for t in transforms:
-        X = t(X).transform(X)
+        X = t.transform(X)
     return X
 
 def fastJoin(rdd1, rdd2):
