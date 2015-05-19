@@ -1,3 +1,6 @@
+from numpy import mean, insert, dot, hstack, zeros
+from scipy.linalg import inv
+
 class RegressionEstimator(object):
     '''
     Abstract base class for all regression fitting procedures
@@ -54,6 +57,7 @@ class QuadProg(RegressionEstimator):
     '''
 
     def __init__(self, X, A, b, **kwargs):
+        from thunder.utils.common import cvxoptMatrix
         super(QuadProg, self).__init__(**kwargs)
         self.X = X
         self.P = cvxoptMatrix(dot(X.T, X))

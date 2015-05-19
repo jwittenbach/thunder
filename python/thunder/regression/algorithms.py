@@ -3,7 +3,8 @@ from scipy.linalg import inv
 from thunder.rdds.series import Series
 from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv, QuadProg
 from thunder.utils.common import fastJoin, cvxoptMatrix
-from thunder.regression.models import RegressionModel
+from thunder.regression.models import RegressionModel, LocalRegressionModel
+from thunder.regression.transformations import AddConstant, Scale
 
 class Regression(object):
 
@@ -54,7 +55,7 @@ class RegressionAlgorithm(object):
         newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
 
         if self.intercept or self.normalize:
-            transforms.append(AddConstant)
+            transforms.append(AddConstant(X))
             index = 1
         else:
             index = 0
