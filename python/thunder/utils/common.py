@@ -260,3 +260,22 @@ class AWSCredentials(object):
     def credentialsAsDict(self):
         access, secret = self.credentials
         return {"aws_access_key_id": access, "aws_secret_access_key": secret}
+
+
+def fastJoin(rdd1, rdd2):
+    '''
+    function to quickly join two rdds
+
+    assumes that both rdds contain key-value pairs and that they are
+    related through a series of maps on the values
+    '''
+
+    try:
+        return rdd1.zip(rdd2).map(lambda (x, y): (x[0], [x[1], y[1]]))
+    except:
+        raise ValueError("could not do a fast join on rdds - should be related by a map on values")
+
+def cvxoptMatrix(x):
+    from cvxopt import matrix
+    return matrix(x, x.shape, 'd')
+
