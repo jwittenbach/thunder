@@ -6,7 +6,8 @@ class RegressionEstimator(object):
     Abstract base class for all regression fitting procedures
     '''
 
-    def __init__(self, intercept=False):
+    def __init__(self, X, intercept=False):
+        self.X = X
         self.intercept = intercept
 
     def estimate(self, y):
@@ -29,7 +30,7 @@ class PseudoInv(RegressionEstimator):
     '''
 
     def __init__(self, X, **kwargs):
-        super(PseudoInv, self).__init__(**kwargs)
+        super(PseudoInv, self).__init__(X, **kwargs)
         self.Xhat = dot(inv(dot(X.T, X)), X.T)
 
     def estimate(self, y):
@@ -58,7 +59,7 @@ class QuadProg(RegressionEstimator):
 
     def __init__(self, X, A, b, **kwargs):
         from thunder.utils.common import cvxoptMatrix
-        super(QuadProg, self).__init__(**kwargs)
+        super(QuadProg, self).__init__(X, **kwargs)
         self.X = X
         self.P = cvxoptMatrix(dot(X.T, X))
         self.A = cvxoptMatrix(A)

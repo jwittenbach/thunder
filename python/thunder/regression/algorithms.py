@@ -4,7 +4,7 @@ from thunder.rdds.series import Series
 from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv, QuadProg
 from thunder.utils.common import fastJoin, cvxoptMatrix
 from thunder.regression.models import RegressionModel, LocalRegressionModel
-from thunder.regression.transformations import AddConstant, Scale
+from thunder.regression.transformations import AddConstant, Scale, applyTransforms
 
 class Regression(object):
 
@@ -20,7 +20,7 @@ class Regression(object):
             'ridge': RidgeRegressionAlgorithm,
             'constrained': ConstrainedRegressionAlgorithm
         }
-        # other options: linear, ridge, lasso, tikhonov, constrained, basis
+        # other options: lasso, basis
 
         return REGALGORITHMS[algorithm](**kwargs)
 
@@ -41,6 +41,15 @@ class RegressionAlgorithm(object):
             self.normalize = True
         else:
             self.normalize = False
+
+    def __repr__(self):
+        from subprocess import check_output
+        className = self.__class__.__name__
+        try:
+            text = check_output(['cowthink', className])
+        except:
+            text = className  
+        return text
 
     def prepare(self):
         raise NotImplementedError
@@ -72,8 +81,11 @@ class RegressionAlgorithm(object):
                     intercept = b0 - dot(scale.mean, slopes)
                     return insert(slopes, 0, intercept)
                 newrdd = newrdd.mapValues(lambda v: v.setBetas(unscale(v.betas, scale)))
+        
+        Xtransformed = applyTransforms(X, transforms)
+        statsrdd = fastJoin(newrdd, y.rdd).mapValues(lambda v: v[0].stats(X, v[1]))
 
-        return RegressionModel(newrdd, transforms)
+        return RegressionModel(newrdd, transforms, statsrdd, self.__class__.__name__)
 
     def fitWithStats(self, X, y):
 
