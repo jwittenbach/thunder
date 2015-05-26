@@ -1,5 +1,6 @@
-from numpy import mean, insert, dot, hstack, zeros
+from numpy import mean, insert, dot, hstack, zeros, array
 from scipy.linalg import inv
+from thunder.utils.common import cvxoptMatrix
 
 class RegressionEstimator(object):
     '''

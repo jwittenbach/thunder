@@ -6,7 +6,12 @@ from thunder.utils.common import fastJoin
 class RegressionModel(object):
 
     '''
-    Class for fitted regression models
+    Class for fitted regression models.
+
+    Backed by an RDD of of key-value paris. The keys are the tuple identifiers from the
+    Series of response variables used in the fit. The values are per-record regression
+    models that contain the coefficients from the fit, though these models are not directly
+    exposed.
     '''
 
     def __init__(self, rdd, transforms=[], statsrdd=None, fittingMethod=None):
@@ -30,19 +35,60 @@ class RegressionModel(object):
 
     @property
     def coefs(self):
+        '''
+        Series containing the coefficients of the model.
+        '''
         if not hasattr(self, 'coefficients'):
             self.coefficients = Series(self.rdd.mapValues(lambda v: v.betas))
         return self.coefficients
 
     @property
     def stats(self):
+        '''
+        Series containing the R-squared values from the original fit of the model.
+        '''
         return Series(self.statsrdd)
 
     def predict(self, X):
+        '''
+        Predicts the responses given a design matrix
+
+        Parameters
+        ----------
+        X: array
+            Design matrix of shape n x k, where n is the number of samples and k is the
+            number of regressors. Even if an intercept term was fit, should NOT include
+            a column of ones.
+
+        Returns
+        -------
+        yhat: Series
+            Series of predictions (each of length n)
+        '''
+
         X = applyTransforms(X, self.transforms)
         return Series(self.rdd.mapValues(lambda v: v.predict(X)))
 
     def score(self, X, y):
+        '''
+        Computes R-squared values for a single design matrix and multiple responses.
+
+        Parameters
+        ----------
+        X: array
+            Design matrix of shape n x k, where n is the number of samples and k is the
+            number of regressors. Even if an intercept term was fit, should NOT include
+            a column of ones.
+
+        y: Series
+            Series of response variables where each record is a vector of length n, where
+            n is the number of samples.
+
+        Returns
+        -------
+        scores: Series
+            Series of R-squared values.
+        '''
         X = applyTransforms(X, self.transforms)
         joined = fastJoin(self.rdd, y.rdd)
         newrdd = joined.mapValues(lambda (model, y): model.stats(X, y))
