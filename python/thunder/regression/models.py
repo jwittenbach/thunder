@@ -34,7 +34,7 @@ class RegressionModel(object):
         return '\n'.join(lines)
 
     @property
-    def coefs(self):
+    def coeffs(self):
         '''
         Series containing the coefficients of the model.
         '''

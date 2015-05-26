@@ -34,7 +34,7 @@ yh4 = np.array([2.7026, -4.6052, 2.7003, -0.1443, -0.3618, -1.8988, 2.8972, 3.46
 #ordinary least squares
 alg1 = Regression('linear', intercept=False)
 model1 = alg1.fit(X, y)
-beta1 = model1.coefs.values().collect()[0]
+beta1 = model1.coeffs.values().collect()[0]
 yhat1 = model1.predict(X).values().collect()[0]
 print 'OLS'
 print '---'
@@ -44,7 +44,7 @@ print '\n'
 
 alg2 = Regression('linear')
 model2 = alg2.fit(X, y)
-beta2 = model2.coefs.values().collect()[0]
+beta2 = model2.coeffs.values().collect()[0]
 yhat2 = model2.predict(X).values().collect()[0]
 print 'OLS + intercept'
 print '---------------'
@@ -55,10 +55,9 @@ print '\n'
 #ridge regression
 R = np.eye(X.shape[1])
 c = 1
-
 alg3 = Regression('ridge',c=1, normalize=True)
 model3 = alg3.fit(X, y)
-beta3 = model3.coefs.values().collect()[0]
+beta3 = model3.coeffs.values().collect()[0]
 yhat3 = model3.predict(X).values().collect()[0]
 print 'ridge'
 print '-----'
@@ -73,7 +72,7 @@ d = np.array([[0]])
 
 alg4 = Regression('constrained', C=C, d=d, intercept=False, normalize=False)
 model4 = alg4.fit(X, y)
-beta4 = model4.coefs.values().collect()[0]
+beta4 = model4.coeffs.values().collect()[0]
 yhat4 = model4.predict(X).values().collect()[0]
 print 'constrained'
 print '-----------'
