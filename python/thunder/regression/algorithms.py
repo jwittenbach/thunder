@@ -49,16 +49,9 @@ class RegressionAlgorithm(object):
         that units are standard deviations from the mean) before fitting the model.
     '''
 
-    def __init__(self, **kwargs):
-        if kwargs.has_key('intercept') and not kwargs['intercept']:
-            self.intercept = False
-        else:
-            self.intercept = True
-
-        if kwargs.has_key('normalize') and kwargs['normalize']:
-            self.normalize = True
-        else:
-            self.normalize = False
+    def __init__(self, intercept=True, normalize=False, **extra):
+        self.intercept=intercept
+        self.normalize=normalize
 
     def __repr__(self):
         from subprocess import check_output
@@ -101,24 +94,11 @@ class RegressionAlgorithm(object):
         estimator, transforms = self.prepare(X)
         newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
 
-        if self.intercept or self.normalize:
-            transforms.append(AddConstant(X))
-            index = 1
-        else:
-            index = 0
+        if self.intercept:
+            transforms.insert(0, AddConstant())
 
         if self.normalize:
-                def unscale(betas, scale):
-                    if self.intercept:
-                        b0 = betas[0]
-                        start = 1
-                    else:
-                        b0 = 0
-                        start = 0
-                    slopes = betas[start:] / scale.std
-                    intercept = b0 - dot(scale.mean, slopes)
-                    return insert(slopes, 0, intercept)
-                newrdd = newrdd.mapValues(lambda v: v.setBetas(unscale(v.betas, scale)))
+            transforms.insert(0, scale)
         
         Xtransformed = applyTransforms(X, transforms)
         statsrdd = fastJoin(newrdd, y.rdd).mapValues(lambda v: v[0].stats(Xtransformed, v[1]))
@@ -177,7 +157,7 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
 
     def prepare(self, X):
         if self.intercept:
-            X = AddConstant(X).transform(X)
+            X = AddConstant().transform(X)
         estimator = PseudoInv(X)
         transforms = []
         return estimator, transforms
@@ -268,7 +248,7 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 
     Given a set of l inequalities that are linear in the regression coefficients, solves the OLS
     problem subject to the constraints imposed by the inequalities via quadratic programming:
-    min over b of (y-Xb), given Cb >= d. Here, the matrix C and the vector d specify the linear constraints.
+    min over b of (y-Xb), given Cb <= d. Here, the matrix C and the vector d specify the linear constraints.
 
     If included, the intercept term is treated as the first regressor.
 
@@ -298,7 +278,7 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 
     def prepare(self, X):
         if self.intercept:
-            X = AddConstant(X).transform(X)
+            X = AddConstant().transform(X)
         estimator = QuadProg(X, self.C, self.d)
         transforms = []
         return estimator, transforms

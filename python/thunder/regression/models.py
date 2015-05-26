@@ -140,4 +140,3 @@ class LocalRegressionModel(object):
     def setBetas(self, betas):
         self.betas = betas
         return self
-         

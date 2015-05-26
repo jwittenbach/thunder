@@ -39,7 +39,7 @@ class AddConstant(Transformation):
     Class for adding a column of 1s to a data matrix
     '''
 
-    def __init__(self, X):
+    def __init__(self):
         pass
 
     def transform(self, X):
