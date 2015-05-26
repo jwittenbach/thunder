@@ -62,7 +62,7 @@ class RegressionAlgorithm(object):
             text = className  
         return text
 
-    def prepare(self, X):
+    def _prepare(self, X):
         raise NotImplementedError
 
     def fit(self, X, y):
@@ -91,7 +91,7 @@ class RegressionAlgorithm(object):
             scale = Scale(X)
             X = scale.transform(X)
 
-        estimator, transforms = self.prepare(X)
+        estimator, transforms = self._prepare(X)
         newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
 
         if self.intercept:
@@ -104,35 +104,6 @@ class RegressionAlgorithm(object):
         statsrdd = fastJoin(newrdd, y.rdd).mapValues(lambda v: v[0].stats(Xtransformed, v[1]))
 
         return RegressionModel(newrdd, transforms, statsrdd, self.__class__.__name__)
-
-    def fitWithStats(self, X, y):
-        '''
-        Fit a regression model and also return the statistics form the fit
-
-        Performs the same operation as 'fit' but also returns a Series containing R-squared
-        values from the fit.
-
-        Parameters
-        ----------
-        X: array
-            Common design matrix for all regression models. Shape n x k; n = number of samples, k =
-            number of regressors
-
-        y: Series (or a subclass)
-            Series of response variables. Each record should be an array of size n.
-
-        Returns
-        -------
-        model: RegressionModel
-            Thunder object for the fitted regression model. Stores the coefficients and can be used
-            to make predictions.
-
-        stats: Series
-            Series that contains the R-squared values from the fit.
-        '''
-        regModel = self.fit(X, y)
-        stats = regModel.stats(X, y)
-        return regModel, stats
 
 
 class LinearRegressionAlgorithm(RegressionAlgorithm):
@@ -155,7 +126,7 @@ class LinearRegressionAlgorithm(RegressionAlgorithm):
     def __init__(self, **kwargs):
         super(LinearRegressionAlgorithm, self).__init__(**kwargs)
 
-    def prepare(self, X):
+    def _prepare(self, X):
         if self.intercept:
             X = AddConstant().transform(X)
         estimator = PseudoInv(X)
@@ -198,7 +169,7 @@ class TikhonovRegressionAlgorithm(RegressionAlgorithm):
         self.c = kwargs['c']
         self.nPenalties = self.R.shape[0]
 
-    def prepare(self, X):
+    def _prepare(self, X):
         X = vstack([X, sqrt(self.c) * self.R])
         estimator = TikhonovPseudoInv(X, self.nPenalties, intercept=self.intercept)
         transforms = []
@@ -234,10 +205,10 @@ class RidgeRegressionAlgorithm(TikhonovRegressionAlgorithm):
         super(TikhonovRegressionAlgorithm, self).__init__(**kwargs)
         self.c = kwargs['c']
 
-    def prepare(self, X):
+    def _prepare(self, X):
         self.nPenalties = X.shape[1]
         self.R = eye(self.nPenalties)
-        return super(RidgeRegressionAlgorithm, self).prepare(X)
+        return super(RidgeRegressionAlgorithm, self)._prepare(X)
 
 class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 
@@ -274,7 +245,7 @@ class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
         self.C = kwargs['C']
         self.d = kwargs['d']
 
-    def prepare(self, X):
+    def _prepare(self, X):
         if self.intercept:
             X = AddConstant().transform(X)
         estimator = QuadProg(X, self.C, self.d)
