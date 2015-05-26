@@ -194,8 +194,6 @@ class TikhonovRegressionAlgorithm(RegressionAlgorithm):
 
     def __init__(self, **kwargs):
         super(TikhonovRegressionAlgorithm, self).__init__(**kwargs)
-        self.intercept = True
-        self.normalize = True
         self.R = kwargs['R']
         self.c = kwargs['c']
         self.nPenalties = self.R.shape[0]
@@ -230,16 +228,16 @@ class RidgeRegressionAlgorithm(TikhonovRegressionAlgorithm):
 
     c: numeric
         Regularization strength.
-
-    n: int
-        Number of regressors (not including the intercept) that will be used.
     '''
 
     def __init__(self, **kwargs):
-        n = kwargs['n']
-        c = kwargs['c']
-        R = eye(n)
-        super(RidgeRegressionAlgorithm, self).__init__(R=R, **kwargs)
+        super(TikhonovRegressionAlgorithm, self).__init__(**kwargs)
+        self.c = kwargs['c']
+
+    def prepare(self, X):
+        self.nPenalties = X.shape[1]
+        self.R = eye(self.nPenalties)
+        return super(RidgeRegressionAlgorithm, self).prepare(X)
 
 class ConstrainedRegressionAlgorithm(RegressionAlgorithm):
 

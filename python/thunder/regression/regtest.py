@@ -56,7 +56,7 @@ print '\n'
 R = np.eye(X.shape[1])
 c = 1
 
-alg3 = Regression('ridge', n=4, c=1)
+alg3 = Regression('ridge',c=1, normalize=True)
 model3 = alg3.fit(X, y)
 beta3 = model3.coefs.values().collect()[0]
 yhat3 = model3.predict(X).values().collect()[0]
