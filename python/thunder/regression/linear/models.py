@@ -1,6 +1,6 @@
 from numpy import dot, square, sum, mean
 from thunder.rdds.series import Series
-from thunder.regression.transformations import applyTransforms
+from thunder.regression.transformations import TransformList
 
 class RegressionModel(object):
     """
@@ -10,27 +10,29 @@ class RegressionModel(object):
     Series of response variables used in the fit. The values are per-record regression
     models that contain the coefficients from the fit, though these models are not directly
     exposed.
+
+    Parameters
+    ----------
+
     """
-    def __init__(self, rdd, transforms=None, stats=None, fittingMethod=None):
-        self.rdd = rdd
+    def __init__(self, models, transforms=None, stats=None, algorithm=None):
+        self._models = models
         if transforms is None:
-            self.transforms = []
-        elif not (type(transforms) is list or type(transforms) is tuple):
-            self.transforms = [transforms]
+            self._transforms = TransformList()
         else:
-            self.transforms = transforms
+            self._transforms = transforms
         self._stats = stats
-        self.fittingMethod = fittingMethod
+        self._algorithm = algorithm
 
     def __repr__(self):
         lines = []
         lines.append(self.__class__.__name__)
-        if self.transforms == []:
+        if self._transforms.transforms is None:
             t = 'None'
         else:
-            t = ', '.join([str(x.__class__.__name__) for x in self.transforms])
+            t = ', '.join([str(x.__class__.__name__) for x in self._transforms.transforms])
         lines.append('transformations: ' + t)
-        lines.append('fit by: ' + str(self.fittingMethod))
+        lines.append('algorithm: ' + str(self._algorithm))
         return '\n'.join(lines)
 
     @property
@@ -38,16 +40,19 @@ class RegressionModel(object):
         """
         Series containing the coefficients of the model.
         """
-        if not hasattr(self, 'coefficients'):
-            self.coefficients = Series(self.rdd.mapValues(lambda v: v.betas))
-        return self.coefficients
+        if not hasattr(self, '_coeffs'):
+            self._coeffs = Series(self._models.mapValues(lambda v: v.betas))
+        return self._coeffs
 
     @property
     def stats(self):
         """
         Series containing the R-squared values from the original fit of the model.
         """
-        return Series(self._stats, index='R2')
+        if self._stats is None:
+            return self._stats
+        else:
+            return Series(self._stats, index='R2')
 
     def predict(self, X):
         """
@@ -65,9 +70,8 @@ class RegressionModel(object):
         yhat: Series
             Series of predictions (each of length n)
         """
-
-        X = applyTransforms(X, self.transforms)
-        return Series(self.rdd.mapValues(lambda v: v.predict(X)))
+        X = self._transforms.apply(X)
+        return Series(self._models.mapValues(lambda v: v.predict(X)))
 
     def score(self, X, y):
         """
@@ -89,14 +93,14 @@ class RegressionModel(object):
         scores: Series
             Series of R-squared values.
         """
-        X = applyTransforms(X, self.transforms)
-        joined = self.rdd.join(y.rdd)
+        X = self._transforms.apply(X)
+        joined = self._models.join(y.rdd)
         newrdd = joined.mapValues(lambda (model, y): model.stats(X, y))
         return Series(newrdd)
 
-    def predictWithStats(self, X, y):
-        X = applyTransforms(X, self.transforms)
-        joined = self.rdd.join(y.rdd)
+    def predictAndScore(self, X, y):
+        X = self._transforms.apply(X)
+        joined = self._models.join(y.rdd)
         results = joined.mapValues(lambda (model, y): model.predictWithStats(X, y))
         yhat = results.mapValues(lambda v: v[0])
         stats = results.mapValues(lambda v: v[1])

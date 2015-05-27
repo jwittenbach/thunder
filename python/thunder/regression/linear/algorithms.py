@@ -1,7 +1,7 @@
 from numpy import dot, vstack, sqrt, eye
 from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv, QuadProg
 from thunder.regression.linear.models import RegressionModel, LocalRegressionModel
-from thunder.regression.transformations import AddConstant, ZScore, applyTransforms
+from thunder.regression.transformations import AddConstant, ZScore, TransformList
 
 
 class LinearRegression(object):
@@ -49,8 +49,8 @@ class LinearRegressionAlgorithm(object):
     """
 
     def __init__(self, intercept=True, zscore=False, **extra):
-        self.intercept = intercept
-        self.zscore = zscore
+        self._intercept = intercept
+        self._zscore = zscore
 
     def __repr__(self):
         from subprocess import check_output
@@ -86,20 +86,20 @@ class LinearRegressionAlgorithm(object):
             Thunder object for the fitted regression model. Stores the coefficients and can be used
             to make predictions.
         """
-        if self.zscore:
+        if self._zscore:
             zscore = ZScore(X)
             X = zscore.transform(X)
 
         estimator, transforms = self._prepare(X)
         newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
 
-        if self.intercept:
-            transforms.insert(0, AddConstant())
+        if self._intercept:
+            transforms.insert(AddConstant())
 
-        if self.zscore:
-            transforms.insert(0, zscore)
+        if self._zscore:
+            transforms.insert(zscore)
         
-        transformedX = applyTransforms(X, transforms)
+        transformedX = transforms.apply(X)
         stats = newrdd.zip(y.rdd.values()).map(lambda (v1, v2): (v1[0], v1[1].stats(transformedX, v2)))
 
         return RegressionModel(newrdd, transforms, stats, self.__class__.__name__)
@@ -126,10 +126,10 @@ class OrdinaryLinearRegression(LinearRegressionAlgorithm):
         super(OrdinaryLinearRegression, self).__init__(**kwargs)
 
     def _prepare(self, X):
-        if self.intercept:
+        if self._intercept:
             X = AddConstant().transform(X)
         estimator = PseudoInv(X)
-        transforms = []
+        transforms = TransformList()
         return estimator, transforms
 
 
@@ -169,8 +169,8 @@ class TikhonovLinearRegression(LinearRegressionAlgorithm):
 
     def _prepare(self, X):
         X = vstack([X, sqrt(self.c) * self.R])
-        estimator = TikhonovPseudoInv(X, self.nPenalties, intercept=self.intercept)
-        transforms = []
+        estimator = TikhonovPseudoInv(X, self.nPenalties, intercept=self._intercept)
+        transforms = TransformList()
         return estimator, transforms
 
 
@@ -241,8 +241,8 @@ class ConstrainedLinearRegression(LinearRegressionAlgorithm):
         self.d = kwargs['d']
 
     def _prepare(self, X):
-        if self.intercept:
+        if self._intercept:
             X = AddConstant().transform(X)
         estimator = QuadProg(X, self.C, self.d)
-        transforms = []
+        transforms = TransformList()
         return estimator, transforms

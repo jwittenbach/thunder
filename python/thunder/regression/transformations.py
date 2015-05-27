@@ -44,10 +44,23 @@ class AddConstant(Transform):
         return hstack([ones([X.shape[0], 1]), X])
 
 
-def applyTransforms(X, transforms):
-    if not (isinstance(transforms, list) or isinstance(transforms, tuple)):
-        transforms = [transforms]
-    for t in transforms:
-        X = t.transform(X)
-    return X
+class TransformList(object):
+    """
+    Class for holding/applying a sequence of Transforms
+    """
+    def __init__(self, transforms=None):
+        self.transforms = transforms
+
+    def insert(self, transform):
+        if self.transforms is None:
+            self.transforms = []
+        self.transforms.insert(0, transform)
+
+    def apply(self, X):
+        if self.transforms is None:
+            return X
+        for t in self.transforms:
+            X = t.transform(X)
+        return X
+
 

@@ -6,6 +6,6 @@ class A(object):
 
 class B(A):
     def __new__(cls, val):
-        
+        return cls(val)       
     def __init__(self, val):
         super(B, self).__init__(val)
