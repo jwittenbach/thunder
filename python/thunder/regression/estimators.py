@@ -3,9 +3,9 @@ from scipy.linalg import inv
 from thunder.utils.common import cvxoptMatrix
 
 class RegressionEstimator(object):
-    '''
+    """
     Abstract base class for all regression fitting procedures
-    '''
+    """
 
     def __init__(self, X, intercept=False):
         self.X = X
@@ -26,9 +26,9 @@ class RegressionEstimator(object):
         return b
 
 class PseudoInv(RegressionEstimator):
-    '''
+    """
     Class for fitting regression models via a psuedo-inverse
-    '''
+    """
 
     def __init__(self, X, **kwargs):
         super(PseudoInv, self).__init__(X, **kwargs)
@@ -38,9 +38,9 @@ class PseudoInv(RegressionEstimator):
         return dot(self.Xhat, y)
 
 class TikhonovPseudoInv(PseudoInv):
-    '''
+    """
     Class for fitting Tikhonov regularization models via a psuedo-inverse
-    '''
+    """
 
     def __init__(self, X, nPenalties, **kwargs):
         self.nPenalties = nPenalties
@@ -52,11 +52,11 @@ class TikhonovPseudoInv(PseudoInv):
 
 
 class QuadProg(RegressionEstimator):
-    '''
+    """
     Class for fitting regression models via quadratic programming
 
     cvxopt.solvers.qp minimizes (1/2)*x'*P*x + q'*x with the constraint Ax <= b
-    '''
+    """
 
     def __init__(self, X, A, b, **kwargs):
         from thunder.utils.common import cvxoptMatrix

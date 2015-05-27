@@ -5,10 +5,9 @@ from thunder.factorization.pca import PCA
 from thunder.factorization.svd import SVD
 from thunder.factorization.ica import ICA
 from thunder.factorization.nmf import NMF
-from thunder.regression.algorithms import Regression 
 from thunder.clustering.kmeans import KMeans, KMeansModel
-from thunder.tuning.tuning import TuningModel
-from thunder.tuning.tuning import GaussianTuningModel, CircularTuningModel
+from thunder.regression.linear.algorithms import LinearRegression 
+from thunder.regression.nonlinear.tuning import GaussianTuningModel, CircularTuningModel 
 from thunder.imgprocessing.registration import Registration, RegistrationModel
 from thunder.imgprocessing.regmethods.crosscorr import CrossCorr, PlanarCrossCorr
 from thunder.extraction.extraction import SourceExtraction
