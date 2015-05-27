@@ -107,7 +107,7 @@ class RegressionModel(object):
         return Series(yhat), Series(stats)
 
 
-class LocalRegressionModel(object):
+class LocalLinearRegressionModel(object):
     """
     Class for fitting and predicting with regression models for each record
     """

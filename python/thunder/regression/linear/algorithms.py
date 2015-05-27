@@ -1,6 +1,6 @@
 from numpy import dot, vstack, sqrt, eye
 from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv, QuadProg
-from thunder.regression.linear.models import RegressionModel, LocalRegressionModel
+from thunder.regression.linear.models import RegressionModel, LocalLinearRegressionModel
 from thunder.regression.transformations import AddConstant, ZScore, TransformList
 
 
@@ -91,7 +91,7 @@ class LinearRegressionAlgorithm(object):
             X = zscore.transform(X)
 
         estimator, transforms = self._prepare(X)
-        newrdd = y.rdd.mapValues(lambda v: LocalRegressionModel().fit(estimator, v))
+        newrdd = y.rdd.mapValues(lambda v: LocalLinearRegressionModel().fit(estimator, v))
 
         if self._intercept:
             transforms.insert(AddConstant())
