@@ -7,6 +7,8 @@ from thunder.factorization.ica import ICA
 from thunder.factorization.nmf import NMF
 from thunder.clustering.kmeans import KMeans, KMeansModel
 from thunder.regression.linear.algorithms import LinearRegression 
+from thunder.regression.linear.algorithms import OrdinaryLinearRegression, TikhonovLinearRegression, RidgeLinearRegression, ConstrainedLinearRegression
+from thunder.regression.nonlinear.tuning import TuningModel
 from thunder.regression.nonlinear.tuning import GaussianTuningModel, CircularTuningModel 
 from thunder.imgprocessing.registration import Registration, RegistrationModel
 from thunder.imgprocessing.regmethods.crosscorr import CrossCorr, PlanarCrossCorr
