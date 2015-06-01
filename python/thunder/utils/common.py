@@ -24,6 +24,17 @@ def isRdd(data):
         return False
 
 
+def aslist(x):
+    """ Convert numpy arrays to lists, keep lists as lists """
+    from numpy import ndarray
+    if isinstance(x, ndarray):
+        return x.tolist()
+    elif isinstance(x, list):
+        return x
+    else:
+        raise TypeError("Expected list or numpy array, got %s" % type(x))
+
+
 def checkParams(param, opts):
     """ Check whether param is contained in opts (including lowercase), otherwise error """
     if not param.lower() in opts:
@@ -268,4 +279,3 @@ def cvxoptMatrix(x):
     if len(x.shape) == 1:
         x = array(x, ndmin=2)
     return matrix(x, x.shape, 'd')
-
