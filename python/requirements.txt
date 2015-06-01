@@ -8,3 +8,4 @@ nose
 rednose
 termcolor
 zope.cachedescriptors
+cvxopt
