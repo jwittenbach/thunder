@@ -272,10 +272,3 @@ class AWSCredentials(object):
         access, secret = self.credentials
         return {"aws_access_key_id": access, "aws_secret_access_key": secret}
 
-
-def cvxoptMatrix(x):
-    from cvxopt import matrix
-    from numpy import array
-    if len(x.shape) == 1:
-        x = array(x, ndmin=2)
-    return matrix(x, x.shape, 'd')

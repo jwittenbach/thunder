@@ -27,9 +27,8 @@ class LinearRegression(object):
             'ordinary': OrdinaryLinearRegression,
             'tikhonov': TikhonovLinearRegression,
             'ridge': RidgeLinearRegression,
-            'constrained': ConstrainedLinearRegression
         }
-        # other options: lasso, basis
+        # other options: lasso, basis, constrained
 
         return REGALGORITHMS[algorithm](**kwargs)
 
@@ -207,42 +206,3 @@ class RidgeLinearRegression(TikhonovLinearRegression):
         self.R = eye(self.nPenalties)
         return super(RidgeLinearRegression, self)._prepare(X)
 
-class ConstrainedLinearRegression(LinearRegressionAlgorithm):
-    """
-    Class for fitting regression models with constrains on coefficients.
-
-    Given a set of l inequalities that are linear in the regression coefficients, solves the OLS
-    problem subject to the constraints imposed by the inequalities via quadratic programming:
-    min over b of (y-Xb), given Cb <= d. Here, the matrix C and the vector d specify the linear constraints.
-
-    If included, the intercept term is treated as the first regressor.
-
-    Parameters
-    ----------
-    intercept: bool, optional, default = True
-        Indicates whether or not a constant intercept term will be included
-
-    normalize: bool, optional, default = False
-        Indicates whether or not the data will be normalized (subtract mean and divide by standard deviation so
-        that units are standard deviations from the mean) before fitting the model.
-
-    C: array
-        Matrix of size l x k that specifies the linear combinations of the regression coefficients
-        on the LHS of the constraints, where l is the number of constraints and k is the number of
-        regressors.
-
-    d: array
-        Vector of length l that specifies the threshold values on the RHS of the constraints, where
-        l is the number of constraints.
-    """
-    def __init__(self, **kwargs):
-        super(ConstrainedLinearRegression, self).__init__(**kwargs)
-        self.C = kwargs['C']
-        self.d = kwargs['d']
-
-    def _prepare(self, X):
-        if self._intercept:
-            X = AddConstant().transform(X)
-        estimator = QuadProg(X, self.C, self.d)
-        transforms = TransformList()
-        return estimator, transforms

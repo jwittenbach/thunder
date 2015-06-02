@@ -22,8 +22,6 @@ before_install:
   - conda info -a
 
 install:
-  # Install linear algebra libraries
-  - sudo apt-get install liblapack-dev
   # Setup miniconda
   - conda create --yes -q -n test-environment python=$TRAVIS_PYTHON_VERSION nose numpy scipy scikit-learn scikit-image matplotlib
   - source activate test-environment

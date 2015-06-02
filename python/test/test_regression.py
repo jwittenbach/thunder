@@ -89,16 +89,6 @@ class TestLinearRegression(PySparkTestCase):
         betas0 = lm.Ridge(fit_intercept=False, alpha=c).fit(self.X, self.y0).coef_
         assert(allclose(betas, betas0, atol=self.tol))
 
-    def test_ConstrainedLinearRegression(self):
-        C = array([[0, 0, 0 ,1]])
-        d = array([0])
-        betas = LinearRegression('constrained', intercept=False, C=C, d=d).fit(self.X, self.y).coeffs.values().first()
-        # sklearn has no constrained regression, so we use values from MATLAB: lsqlin(X, y0, C, d)
-        betas0 = array([-3.5977, 2.0694, 1.2690, 0])
-        print betas
-        print betas0
-        assert(allclose(betas, betas0, atol=self.tol))
-
     def test_LinearRegressionModelMethods(self):
         model = LinearRegression().fit(self.X, self.y)
         model0 = lm.LinearRegression().fit(self.X, self.y0)
