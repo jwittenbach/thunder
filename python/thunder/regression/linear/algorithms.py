@@ -1,5 +1,5 @@
 from numpy import dot, vstack, sqrt, eye
-from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv, QuadProg
+from thunder.regression.estimators import PseudoInv, TikhonovPseudoInv
 from thunder.regression.linear.models import RegressionModel, LocalLinearRegressionModel
 from thunder.regression.transformations import AddConstant, ZScore, TransformList
 

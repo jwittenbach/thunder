@@ -1,6 +1,5 @@
 from numpy import mean, insert, dot, hstack, zeros, array
 from scipy.linalg import inv
-from thunder.utils.common import cvxoptMatrix
 
 class RegressionEstimator(object):
     """
@@ -49,26 +48,4 @@ class TikhonovPseudoInv(PseudoInv):
     def estimate(self, y):
         y = hstack([y, zeros(self.nPenalties)])
         return super(TikhonovPseudoInv, self).estimate(y)
-
-
-class QuadProg(RegressionEstimator):
-    """
-    Class for fitting regression models via quadratic programming
-
-    cvxopt.solvers.qp minimizes (1/2)*x'*P*x + q'*x with the constraint Ax <= b
-    """
-
-    def __init__(self, X, A, b, **kwargs):
-        from thunder.utils.common import cvxoptMatrix
-        super(QuadProg, self).__init__(X, **kwargs)
-        self.X = X
-        self.P = cvxoptMatrix(dot(X.T, X))
-        self.A = cvxoptMatrix(A)
-        self.b = cvxoptMatrix(b)
-
-    def estimate(self, y):
-        from cvxopt.solvers import qp, options
-        options['show_progress'] = False
-        q = cvxoptMatrix(array(dot(-self.X.T, y), ndmin=2).T)
-        return array(qp(self.P, q, self.A, self.b)['x']).flatten()
 
