@@ -130,7 +130,7 @@ class LocalLinearRegressionModel(object):
         SSR = sum(square(y - yhat))
 
         if SST == 0:
-            Rsq = 1
+            Rsq = 0
         else:
             Rsq = 1 - SSR/SST
 
