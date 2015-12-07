@@ -984,7 +984,8 @@ class Series(Data):
         from thunder.rdds.spatialseries import SpatialSeries
         return SpatialSeries(self.rdd).__finalize__(self)
 
-    def _makeMasks(self, index=None, level=0):
+    @staticmethod
+    def _makeMasks(index, level=0):
         """
         Internal function for generating masks for selecting values based on multi-index values.
     
@@ -994,7 +995,7 @@ class Series(Data):
 
         if index is None:
             index = self.index
-        
+
         try:
             dims = len(array(index).shape)
             if dims == 1:
@@ -1013,9 +1014,9 @@ class Series(Data):
         combs = product(*[unique(index.T[i, :]) for i in xrange(nlevels)])
         combs = array([l for l in combs])
 
-        masks = array([[array_equal(index[i], c) for i in xrange(lenIdx)] for c in combs])
-
-        return zip(*[(masks[x], combs[x]) for x in xrange(len(masks)) if masks[x].any()])
+        maskGenerator = (array([array_equal(index[i], c) for i in xrange(lenIdx)]) for c in combs)
+        
+        return combs, maskGenerator
 
     def _applyByIndex(self, function, level=0):
         """
@@ -1030,14 +1031,28 @@ class Series(Data):
         if type(level) is int:
             level = [level]
 
-        masks, ind = self._makeMasks(index=self.index, level=level)
-        bcMasks = self.rdd.ctx.broadcast(masks)
-        nMasks = len(masks)
-        newrdd = self.rdd.mapValues(lambda v: [array(function(v[bcMasks.value[x]])) for x in xrange(nMasks)])
-        index = array(ind)
-        if len(index[0]) == 1:
-            index = ravel(index)
-        return self._constructor(newrdd, index=index).__finalize__(self, noPropagate=('_dtype',))
+        index = self.index
+
+        combs, _ = self._makeMasks(index, level=level)
+
+        def applyMaskPartition(partition, index, level, function): 
+            _, masks = Series._makeMasks(index, level=level)
+            results = []
+            keys = []
+            for ((i, mask), (j, record)) in product(enumerate(masks), enumerate(partition)): 
+                k, v = record
+                newValue = function(v[mask])
+                
+
+                if i == 0:
+                    results.append((k, [newValue]))
+                else:
+                    results[j][1].append(newValue) 
+            return [(k, array(v)) for (k, v) in results]
+                     
+        newrdd = self.rdd.mapPartitions(lambda p: applyMaskPartition(p, index, level, function))
+        return self._constructor(newrdd, index=squeeze(combs)).__finalize__(self, noPropagate=('dtype',))
+
 
     def selectByIndex(self, val, level=0, squeeze=False, filter=False, returnMask=False):
         """
@@ -1111,7 +1126,8 @@ class Series(Data):
 
         #TODO: this could be more efficient if _makeMasks also accepted the desired values so that
         #we not produce ALL possible masks which we must then filter down to the ones we want
-        masks, ind = self._makeMasks(index=self.index, level=level)
+        ind, masks = self._makeMasks(index=self.index, level=level)
+        masks = [m for m in masks]
         nmasks = len(masks)
         masks = array([masks[x] for x in xrange(nmasks) if tuple(ind[x]) in selected])
 
